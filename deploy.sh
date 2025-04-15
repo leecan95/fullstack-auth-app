@@ -3,41 +3,59 @@
 # Exit on any error
 set -e
 
-echo "Deploying Fullstack Auth App to EC2..."
+echo "Deploying Fullstack Auth App to AWS EC2..."
 
 # 1. Update system packages
 echo "Updating system packages..."
 sudo apt update
 sudo apt upgrade -y
 
-# 2. Install required software if not installed
+# 2. Install required software
 echo "Installing required software..."
+
+# Install Node.js 18.x (LTS)
 if ! command -v node &> /dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+    echo "Installing Node.js 18.x..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
     sudo apt install -y nodejs
 fi
 
+# Install PostgreSQL 15
 if ! command -v psql &> /dev/null; then
-    sudo apt install -y postgresql postgresql-contrib
+    echo "Installing PostgreSQL 15..."
+    sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+    sudo apt update
+    sudo apt install -y postgresql-15 postgresql-contrib
 fi
 
+# Install Nginx
 if ! command -v nginx &> /dev/null; then
+    echo "Installing Nginx..."
     sudo apt install -y nginx
 fi
 
+# Install PM2 globally
 if ! command -v pm2 &> /dev/null; then
+    echo "Installing PM2..."
     sudo npm install -g pm2
 fi
 
-# 3. Set up database (if not already set up)
-echo "Setting up database..."
-if sudo -u postgres psql -lqt | grep -q auth_db; then
-    echo "Database already exists, skipping database creation."
-else
-    echo "Creating database user and database..."
+# Install Git if not present
+if ! command -v git &> /dev/null; then
+    echo "Installing Git..."
+    sudo apt install -y git
+fi
+
+# 3. Set up PostgreSQL
+echo "Setting up PostgreSQL..."
+
+# Create database and user if they don't exist
+if ! sudo -u postgres psql -lqt | grep -q auth_db; then
+    echo "Creating database and user..."
     sudo -u postgres createuser --superuser authapp || true
     sudo -u postgres createdb auth_db || true
-    sudo -u postgres psql -c "ALTER USER authapp WITH PASSWORD 'your_secure_password';" || true
+    sudo -u postgres psql -c "ALTER USER authapp WITH PASSWORD 'cancaucacan';" || true
     
     # Import schema
     sudo cp server/database.sql /tmp/
@@ -45,42 +63,22 @@ else
     sudo -u postgres psql -f /tmp/database.sql
 fi
 
-# 4. Install project dependencies
-echo "Installing project dependencies..."
-npm run install-all
+# 4. Configure PostgreSQL for remote access
+echo "Configuring PostgreSQL for remote access..."
+sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/15/main/postgresql.conf
+sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             0.0.0.0\/0            scram-sha-256/" /etc/postgresql/15/main/pg_hba.conf
 
-# 5. Configure environment variables
-echo "Setting up environment variables..."
-if [ ! -f "server/.env" ]; then
-    echo "Creating server .env file..."
-    cat > server/.env << EOF
-PORT=5000
-DB_USER=authapp
-DB_PASSWORD=your_secure_password
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=auth_db
-JWT_SECRET=$(openssl rand -hex 32)
-EOF
-fi
+# Restart PostgreSQL
+sudo systemctl restart postgresql
 
-# 6. Build the client application
-echo "Building React client..."
-cd client
-npm run build
-cd ..
-
-# 7. Set up Nginx configuration
+# 5. Set up Nginx
 echo "Configuring Nginx..."
-if [ ! -f "/etc/nginx/sites-available/fullstack-auth-app" ]; then
-    echo "Creating Nginx config file..."
-    # Get the EC2 public IP
-    EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-    
-    sudo tee /etc/nginx/sites-available/fullstack-auth-app > /dev/null << EOF
+
+# Create Nginx configuration
+sudo tee /etc/nginx/sites-available/fullstack-auth-app > /dev/null << EOF
 server {
     listen 80;
-    server_name $EC2_PUBLIC_IP;
+    server_name _;
 
     location / {
         root $(pwd)/client/dist;
@@ -99,13 +97,39 @@ server {
 }
 EOF
 
-    sudo ln -sf /etc/nginx/sites-available/fullstack-auth-app /etc/nginx/sites-enabled/
-    sudo rm -f /etc/nginx/sites-enabled/default
-    sudo nginx -t
-    sudo systemctl restart nginx
+# Enable the site and remove default
+sudo ln -sf /etc/nginx/sites-available/fullstack-auth-app /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and restart Nginx
+sudo nginx -t
+sudo systemctl restart nginx
+
+# 6. Set up environment variables
+echo "Setting up environment variables..."
+if [ ! -f "server/.env" ]; then
+    cat > server/.env << EOF
+PORT=5000
+DB_USER=authapp
+DB_PASSWORD=cancaucacan
+DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=auth_db
+JWT_SECRET=$(openssl rand -hex 32)
+EOF
 fi
 
-# 8. Start the application with PM2
+# 7. Install project dependencies
+echo "Installing project dependencies..."
+npm run install-all
+
+# 8. Build the client application
+echo "Building React client..."
+cd client
+npm run build
+cd ..
+
+# 9. Start the application with PM2
 echo "Starting application with PM2..."
 pm2 describe auth-api > /dev/null 2>&1 || pm2 start server/index.js --name auth-api
 
@@ -113,5 +137,30 @@ pm2 describe auth-api > /dev/null 2>&1 || pm2 start server/index.js --name auth-
 pm2 startup
 pm2 save
 
-echo "Deployment complete! Your application should be running at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
-echo "Note: You may need to configure your security groups to allow traffic on ports 80, 443, and 5000." 
+# 10. Set up SSL with Let's Encrypt (optional)
+read -p "Do you want to set up SSL with Let's Encrypt? (y/n): " setup_ssl
+if [ "$setup_ssl" = "y" ]; then
+    echo "Setting up SSL with Let's Encrypt..."
+    sudo apt install -y certbot python3-certbot-nginx
+    read -p "Enter your domain name: " domain_name
+    sudo certbot --nginx -d $domain_name -d www.$domain_name
+fi
+
+# 11. Configure firewall
+echo "Configuring firewall..."
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+
+echo "Deployment complete!"
+echo "Your application should be running at:"
+echo "HTTP: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+if [ "$setup_ssl" = "y" ]; then
+    echo "HTTPS: https://$domain_name"
+fi
+
+echo "To monitor your application:"
+echo "1. Check logs: pm2 logs auth-api"
+echo "2. Check status: pm2 status"
+echo "3. Restart if needed: pm2 restart auth-api" 
