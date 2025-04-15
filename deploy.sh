@@ -110,14 +110,22 @@ if [ "$setup_ssl" = "y" ]; then
     sudo certbot --nginx -d $domain_name -d www.$domain_name
 fi
 
-# 9. Configure firewall
-echo "Configuring firewall..."
-sudo systemctl enable firewalld
-sudo systemctl start firewalld
-sudo firewall-cmd --permanent --add-service=ssh
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --reload
+# 9. Configure security groups (instead of local firewall)
+echo "Configuring security groups..."
+echo "Please ensure your EC2 security group allows inbound traffic on:"
+echo "- Port 22 (SSH)"
+echo "- Port 80 (HTTP)"
+echo "- Port 443 (HTTPS, if SSL is enabled)"
+echo ""
+echo "You can configure these in the AWS Management Console:"
+echo "1. Go to EC2 Dashboard"
+echo "2. Click on 'Security Groups'"
+echo "3. Select your instance's security group"
+echo "4. Click 'Edit inbound rules'"
+echo "5. Add the following rules:"
+echo "   - Type: SSH, Port: 22, Source: Your IP"
+echo "   - Type: HTTP, Port: 80, Source: 0.0.0.0/0"
+echo "   - Type: HTTPS, Port: 443, Source: 0.0.0.0/0 (if SSL is enabled)"
 
 echo "Deployment complete!"
 echo "Your application should be running at:"
