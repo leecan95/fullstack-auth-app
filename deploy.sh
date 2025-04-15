@@ -41,9 +41,10 @@ fi
 
 # 3. Set up environment variables
 echo "Setting up environment variables..."
+# Update the PORT in the environment variables section
 if [ ! -f "server/.env" ]; then
     cat > server/.env << EOF
-PORT=5000
+PORT=5001
 DB_USER=postgres
 DB_PASSWORD=cancaucacan
 DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
@@ -57,10 +58,15 @@ fi
 echo "Configuring Nginx..."
 
 # Create Nginx configuration
+# Update your Nginx configuration section
 sudo tee /etc/nginx/conf.d/fullstack-auth-app.conf > /dev/null << EOF
 server {
     listen 80;
     server_name _;
+
+    # Add error logging
+    error_log /var/log/nginx/fullstack-app-error.log debug;
+    access_log /var/log/nginx/fullstack-app-access.log;
 
     # Add this line to handle favicon.ico requests
     location = /favicon.ico {
@@ -73,8 +79,6 @@ server {
         root /home/ec2-user/first-app/fullstack-auth-app/client/dist;
         index index.html;
         try_files \$uri \$uri/ /index.html;
-        # Add these lines to debug
-        error_log /var/log/nginx/react_error.log debug;
         # Add proper permissions
         add_header 'Access-Control-Allow-Origin' '*';
     }
@@ -86,6 +90,11 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
+        # Add timeout settings
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+        proxy_read_timeout 300;
+        send_timeout 300;
     }
 }
 EOF
@@ -156,3 +165,25 @@ echo "To monitor your application:"
 echo "1. Check logs: pm2 logs auth-api"
 echo "2. Check status: pm2 status"
 echo "3. Restart if needed: pm2 restart auth-api"
+
+# After building the client application and copying files to dist
+echo "Setting proper file permissions..."
+sudo chmod -R 755 /home/ec2-user/first-app/fullstack-auth-app/client/dist
+sudo chown -R nginx:nginx /home/ec2-user/first-app/fullstack-auth-app/client/dist
+# Add after setting permissions
+echo "Setting SELinux context if needed..."
+if command -v getenforce &> /dev/null; then
+    if [ "$(getenforce)" = "Enforcing" ]; then
+        sudo chcon -Rt httpd_sys_content_t /home/ec2-user/first-app/fullstack-auth-app/client/dist
+    fi
+fi
+
+# Add after starting the application with PM2
+echo "Checking application status..."
+pm2 status
+echo "Checking if server is listening on port 5001..."
+netstat -tulpn | grep 5001 || echo "Server not listening on port 5001"
+echo "Checking Nginx configuration..."
+sudo nginx -t
+echo "Checking Nginx status..."
+sudo systemctl status nginx
