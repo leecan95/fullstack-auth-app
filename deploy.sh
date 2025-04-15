@@ -58,18 +58,19 @@ echo "Configuring Nginx..."
 
 # Create Nginx configuration
 sudo tee /etc/nginx/conf.d/fullstack-auth-app.conf > /dev/null << EOF
+# Update this section in your deploy.sh file
 server {
     listen 80;
     server_name _;
 
     location / {
-        root $(pwd)/client/dist;
+        root $(pwd)/client/dist;  # Make sure this matches your build output directory
         index index.html;
         try_files \$uri \$uri/ /index.html;
     }
 
     location /api {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://localhost:5001;  # Updated to match your server port
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';

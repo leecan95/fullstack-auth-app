@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
       // Fetch user profile
       const fetchUser = async () => {
         try {
-          const res = await axios.get(`${API_URL}/api/auth/profile`);
+          const res = await axios.get(`${API_URL}/auth/profile`);  // Removed duplicate /api
           setCurrentUser(res.data);
           setIsAuthenticated(true);
         } catch (err) {
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   // Register user
   const register = async (username, email, password) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/register`, {
+      const res = await axios.post(`${API_URL}/auth/register`, {  // Removed duplicate /api
         username,
         email,
         password
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
   // Login user
   const login = async (email, password) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/login`, {
+      const res = await axios.post(`${API_URL}/auth/login`, {  // Removed duplicate /api
         email,
         password
       });
