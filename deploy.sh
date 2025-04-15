@@ -7,8 +7,7 @@ echo "Deploying Fullstack Auth App to AWS EC2..."
 
 # 1. Update system packages
 echo "Updating system packages..."
-sudo apt update
-sudo apt upgrade -y
+sudo dnf update -y
 
 # 2. Install required software
 echo "Installing required software..."
@@ -16,23 +15,25 @@ echo "Installing required software..."
 # Install Node.js 18.x (LTS)
 if ! command -v node &> /dev/null; then
     echo "Installing Node.js 18.x..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-    sudo apt install -y nodejs
+    curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+    sudo dnf install -y nodejs
 fi
 
 # Install PostgreSQL 15
 if ! command -v psql &> /dev/null; then
     echo "Installing PostgreSQL 15..."
-    sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-    sudo apt update
-    sudo apt install -y postgresql-15 postgresql-contrib
+    sudo dnf install -y postgresql15 postgresql15-server postgresql15-contrib
+    sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
+    sudo systemctl enable postgresql-15
+    sudo systemctl start postgresql-15
 fi
 
 # Install Nginx
 if ! command -v nginx &> /dev/null; then
     echo "Installing Nginx..."
-    sudo apt install -y nginx
+    sudo dnf install -y nginx
+    sudo systemctl enable nginx
+    sudo systemctl start nginx
 fi
 
 # Install PM2 globally
@@ -44,7 +45,7 @@ fi
 # Install Git if not present
 if ! command -v git &> /dev/null; then
     echo "Installing Git..."
-    sudo apt install -y git
+    sudo dnf install -y git
 fi
 
 # 3. Set up PostgreSQL
@@ -65,17 +66,17 @@ fi
 
 # 4. Configure PostgreSQL for remote access
 echo "Configuring PostgreSQL for remote access..."
-sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/15/main/postgresql.conf
-sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             0.0.0.0\/0            scram-sha-256/" /etc/postgresql/15/main/pg_hba.conf
+sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /var/lib/pgsql/15/data/postgresql.conf
+sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             0.0.0.0\/0            scram-sha-256/" /var/lib/pgsql/15/data/pg_hba.conf
 
 # Restart PostgreSQL
-sudo systemctl restart postgresql
+sudo systemctl restart postgresql-15
 
 # 5. Set up Nginx
 echo "Configuring Nginx..."
 
 # Create Nginx configuration
-sudo tee /etc/nginx/sites-available/fullstack-auth-app > /dev/null << EOF
+sudo tee /etc/nginx/conf.d/fullstack-auth-app.conf > /dev/null << EOF
 server {
     listen 80;
     server_name _;
@@ -96,10 +97,6 @@ server {
     }
 }
 EOF
-
-# Enable the site and remove default
-sudo ln -sf /etc/nginx/sites-available/fullstack-auth-app /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
 
 # Test and restart Nginx
 sudo nginx -t
@@ -141,17 +138,19 @@ pm2 save
 read -p "Do you want to set up SSL with Let's Encrypt? (y/n): " setup_ssl
 if [ "$setup_ssl" = "y" ]; then
     echo "Setting up SSL with Let's Encrypt..."
-    sudo apt install -y certbot python3-certbot-nginx
+    sudo dnf install -y certbot python3-certbot-nginx
     read -p "Enter your domain name: " domain_name
     sudo certbot --nginx -d $domain_name -d www.$domain_name
 fi
 
 # 11. Configure firewall
 echo "Configuring firewall..."
-sudo ufw allow 22/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw --force enable
+sudo systemctl enable firewalld
+sudo systemctl start firewalld
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
 
 echo "Deployment complete!"
 echo "Your application should be running at:"
