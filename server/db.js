@@ -5,7 +5,11 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'cancaucacan',
   host: process.env.DB_HOST || 'postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com',
   port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'auth_db'
+  database: process.env.DB_NAME || 'auth_db',
+  // Add SSL configuration
+  ssl: {
+    rejectUnauthorized: false // Set to true in production with proper certificates
+  }
 });
 
 // Add connection error handling and logging
