@@ -62,10 +62,21 @@ server {
     listen 80;
     server_name _;
 
+    # Add this line to handle favicon.ico requests
+    location = /favicon.ico {
+        access_log off;
+        log_not_found off;
+        return 204;
+    }
+
     location / {
-        root /home/ec2-user/first-app/fullstack-auth-app/client/dist;  # Updated path to match actual location
+        root /home/ec2-user/first-app/fullstack-auth-app/client/dist;
         index index.html;
         try_files \$uri \$uri/ /index.html;
+        # Add these lines to debug
+        error_log /var/log/nginx/react_error.log debug;
+        # Add proper permissions
+        add_header 'Access-Control-Allow-Origin' '*';
     }
 
     location /api {
@@ -91,6 +102,13 @@ npm run install-all
 echo "Building React client..."
 cd client
 npm run build
+# Check if dist directory exists, if not, create it and copy from build
+if [ ! -d "dist" ]; then
+  mkdir -p dist
+  if [ -d "build" ]; then
+    cp -r build/* dist/
+  fi
+fi
 cd ..
 
 # 7. Start the application with PM2
