@@ -19,15 +19,6 @@ if ! command -v node &> /dev/null; then
     sudo dnf install -y nodejs
 fi
 
-# Install PostgreSQL 15
-if ! command -v psql &> /dev/null; then
-    echo "Installing PostgreSQL 15..."
-    sudo dnf install -y postgresql15 postgresql15-server postgresql15-contrib
-    sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
-    sudo systemctl enable postgresql-15
-    sudo systemctl start postgresql-15
-fi
-
 # Install Nginx
 if ! command -v nginx &> /dev/null; then
     echo "Installing Nginx..."
@@ -48,31 +39,21 @@ if ! command -v git &> /dev/null; then
     sudo dnf install -y git
 fi
 
-# 3. Set up PostgreSQL
-echo "Setting up PostgreSQL..."
-
-# Create database and user if they don't exist
-if ! psql -lqt | grep -q auth_db; then
-    echo "Creating database and user..."
-    # Create user and database
-    sudo -u postgresql psql -c "CREATE USER authapp WITH PASSWORD 'cancaucacan' SUPERUSER;" || true
-    sudo -u postgresql psql -c "CREATE DATABASE auth_db OWNER authapp;" || true
-    
-    # Import schema
-    cp server/database.sql /tmp/
-    sudo chown postgresql:postgresql /tmp/database.sql
-    sudo -u postgresql psql -d auth_db -f /tmp/database.sql
+# 3. Set up environment variables
+echo "Setting up environment variables..."
+if [ ! -f "server/.env" ]; then
+    cat > server/.env << EOF
+PORT=5000
+DB_USER=postgres
+DB_PASSWORD=cancaucacan
+DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=auth_db
+JWT_SECRET=$(openssl rand -hex 32)
+EOF
 fi
 
-# 4. Configure PostgreSQL for remote access
-echo "Configuring PostgreSQL for remote access..."
-sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /var/lib/pgsql/15/data/postgresql.conf
-sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             0.0.0.0\/0            scram-sha-256/" /var/lib/pgsql/15/data/pg_hba.conf
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql-15
-
-# 5. Set up Nginx
+# 4. Set up Nginx
 echo "Configuring Nginx..."
 
 # Create Nginx configuration
@@ -102,31 +83,17 @@ EOF
 sudo nginx -t
 sudo systemctl restart nginx
 
-# 6. Set up environment variables
-echo "Setting up environment variables..."
-if [ ! -f "server/.env" ]; then
-    cat > server/.env << EOF
-PORT=5000
-DB_USER=authapp
-DB_PASSWORD=cancaucacan
-DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
-DB_PORT=5432
-DB_NAME=auth_db
-JWT_SECRET=$(openssl rand -hex 32)
-EOF
-fi
-
-# 7. Install project dependencies
+# 5. Install project dependencies
 echo "Installing project dependencies..."
 npm run install-all
 
-# 8. Build the client application
+# 6. Build the client application
 echo "Building React client..."
 cd client
 npm run build
 cd ..
 
-# 9. Start the application with PM2
+# 7. Start the application with PM2
 echo "Starting application with PM2..."
 pm2 describe auth-api > /dev/null 2>&1 || pm2 start server/index.js --name auth-api
 
@@ -134,7 +101,7 @@ pm2 describe auth-api > /dev/null 2>&1 || pm2 start server/index.js --name auth-
 pm2 startup
 pm2 save
 
-# 10. Set up SSL with Let's Encrypt (optional)
+# 8. Set up SSL with Let's Encrypt (optional)
 read -p "Do you want to set up SSL with Let's Encrypt? (y/n): " setup_ssl
 if [ "$setup_ssl" = "y" ]; then
     echo "Setting up SSL with Let's Encrypt..."
@@ -143,7 +110,7 @@ if [ "$setup_ssl" = "y" ]; then
     sudo certbot --nginx -d $domain_name -d www.$domain_name
 fi
 
-# 11. Configure firewall
+# 9. Configure firewall
 echo "Configuring firewall..."
 sudo systemctl enable firewalld
 sudo systemctl start firewalld
