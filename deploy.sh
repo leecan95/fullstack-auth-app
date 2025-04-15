@@ -95,7 +95,7 @@ cd ..
 
 # 7. Start the application with PM2
 echo "Starting application with PM2..."
-pm2 describe auth-api > /dev/null 2>&1 || pm2 start server/index.js --name auth-api
+pm2 describe auth-api > /dev/null 2>&1 || pm2 start server/index.js --name auth-api -- --port 5001
 
 # Configure PM2 to start on system boot
 pm2 startup
@@ -137,4 +137,4 @@ fi
 echo "To monitor your application:"
 echo "1. Check logs: pm2 logs auth-api"
 echo "2. Check status: pm2 status"
-echo "3. Restart if needed: pm2 restart auth-api" 
+echo "3. Restart if needed: pm2 restart auth-api"
