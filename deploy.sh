@@ -52,16 +52,16 @@ fi
 echo "Setting up PostgreSQL..."
 
 # Create database and user if they don't exist
-if ! sudo -u postgres psql -lqt | grep -q auth_db; then
+if ! psql -lqt | grep -q auth_db; then
     echo "Creating database and user..."
-    sudo -u postgres createuser --superuser authapp || true
-    sudo -u postgres createdb auth_db || true
-    sudo -u postgres psql -c "ALTER USER authapp WITH PASSWORD 'cancaucacan';" || true
+    # Create user and database
+    sudo -u postgresql psql -c "CREATE USER authapp WITH PASSWORD 'cancaucacan' SUPERUSER;" || true
+    sudo -u postgresql psql -c "CREATE DATABASE auth_db OWNER authapp;" || true
     
     # Import schema
-    sudo cp server/database.sql /tmp/
-    sudo chown postgres:postgres /tmp/database.sql
-    sudo -u postgres psql -f /tmp/database.sql
+    cp server/database.sql /tmp/
+    sudo chown postgresql:postgresql /tmp/database.sql
+    sudo -u postgresql psql -d auth_db -f /tmp/database.sql
 fi
 
 # 4. Configure PostgreSQL for remote access
@@ -107,7 +107,7 @@ echo "Setting up environment variables..."
 if [ ! -f "server/.env" ]; then
     cat > server/.env << EOF
 PORT=5000
-DB_USER=postgres
+DB_USER=authapp
 DB_PASSWORD=cancaucacan
 DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
 DB_PORT=5432
