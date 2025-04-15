@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
 // API base URL - for production deployment
-const API_URL = 'http://52.63.38.3/api';  // Update to match your EC2 public IP
+const API_URL = 'http://52.63.38.3:5001/api';  // Update to match your EC2 public IP
 
 const AuthContext = createContext();
 
