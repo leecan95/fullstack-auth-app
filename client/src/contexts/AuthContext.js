@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
 // API base URL - for production deployment
-const API_URL = 'http://52.63.38.3/api';
+const API_URL = 'http://localhost:5001/api';
 
 const AuthContext = createContext();
 
@@ -117,4 +117,4 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};
