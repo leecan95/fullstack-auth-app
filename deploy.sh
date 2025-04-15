@@ -107,7 +107,7 @@ echo "Setting up environment variables..."
 if [ ! -f "server/.env" ]; then
     cat > server/.env << EOF
 PORT=5000
-DB_USER=authapp
+DB_USER=postgres
 DB_PASSWORD=cancaucacan
 DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
 DB_PORT=5432
