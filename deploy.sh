@@ -43,6 +43,10 @@ fi
 echo "Setting up environment variables..."
 # Update the PORT in the environment variables section
 if [ ! -f "server/.env" ]; then
+    # Generate a secure JWT secret
+    JWT_SECRET=$(openssl rand -hex 32)
+    echo "Generated new JWT_SECRET: $JWT_SECRET"
+    
     cat > server/.env << EOF
 PORT=5001
 DB_USER=postgres
@@ -50,8 +54,15 @@ DB_PASSWORD=cancaucacan
 DB_HOST=postgre-db.craw4ikasnx6.ap-southeast-2.rds.amazonaws.com
 DB_PORT=5432
 DB_NAME=auth_db
-JWT_SECRET=$(openssl rand -hex 32)
+JWT_SECRET=$JWT_SECRET
 EOF
+else
+    # Make sure JWT_SECRET exists in the .env file
+    if ! grep -q "JWT_SECRET" server/.env; then
+        JWT_SECRET=$(openssl rand -hex 32)
+        echo "JWT_SECRET=$JWT_SECRET" >> server/.env
+        echo "Added missing JWT_SECRET to existing .env file"
+    fi
 fi
 
 # 4. Set up Nginx

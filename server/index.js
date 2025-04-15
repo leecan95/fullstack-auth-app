@@ -6,6 +6,15 @@ const app = express();
 const authRoutes = require('./routes/auth');
 const db = require('./db');
 
+// Verify JWT_SECRET is set
+if (!process.env.JWT_SECRET) {
+  console.error('ERROR: JWT_SECRET is not set in environment variables');
+  console.error('Please make sure your .env file contains JWT_SECRET');
+  process.exit(1); // Exit with error
+} else {
+  console.log('JWT_SECRET is properly configured');
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -22,4 +31,4 @@ app.get('/', (req, res) => {
 const port = process.env.PORT || 5001;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
-}); 
+});
