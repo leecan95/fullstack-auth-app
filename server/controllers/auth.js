@@ -28,21 +28,27 @@ exports.register = async (req, res) => {
     );
     
     // Generate JWT token
-    const token = jwt.sign(
-      { id: newUser.rows[0].id },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-    
-    res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: newUser.rows[0].id,
-        username: newUser.rows[0].username,
-        email: newUser.rows[0].email
-      }
-    });
+    try {
+      const token = jwt.sign(
+        { id: newUser.rows[0].id },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+      
+      res.status(201).json({
+        message: 'User registered successfully',
+        token,
+        user: {
+          id: newUser.rows[0].id,
+          username: newUser.rows[0].username,
+          email: newUser.rows[0].email
+        }
+      });
+      
+    } catch (jwtError) {
+      console.error('JWT signing error:', jwtError);
+      return res.status(500).json({ message: 'Error generating authentication token' });
+    }
     
   } catch (err) {
     console.error(err.message);
@@ -73,21 +79,27 @@ exports.login = async (req, res) => {
     }
     
     // Generate JWT token
-    const token = jwt.sign(
-      { id: user.rows[0].id },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-    
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user.rows[0].id,
-        username: user.rows[0].username,
-        email: user.rows[0].email
-      }
-    });
+    try {
+      const token = jwt.sign(
+        { id: user.rows[0].id },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+      
+      res.json({
+        message: 'Login successful',
+        token,
+        user: {
+          id: user.rows[0].id,
+          username: user.rows[0].username,
+          email: user.rows[0].email
+        }
+      });
+      
+    } catch (jwtError) {
+      console.error('JWT signing error:', jwtError);
+      return res.status(500).json({ message: 'Error generating authentication token' });
+    }
     
   } catch (err) {
     console.error(err.message);
@@ -113,4 +125,4 @@ exports.getProfile = async (req, res) => {
     console.error(err.message);
     res.status(500).json({ message: 'Server error' });
   }
-}; 
+};
