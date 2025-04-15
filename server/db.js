@@ -8,6 +8,20 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'auth_db'
 });
 
+// Add connection error handling and logging
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
+
+// Test connection on startup
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Database connection error:', err);
+  } else {
+    console.log('Successfully connected to PostgreSQL database');
+  }
+});
+
 module.exports = {
   query: (text, params) => pool.query(text, params)
-}; 
+};
